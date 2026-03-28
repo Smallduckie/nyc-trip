@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>NYC Trip 2026 🗽</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗽</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+<!-- Firebase SDK (compat version - simpler) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+
+<!-- React via CDN -->
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0c0c1d; --card: #161631; --card2: #1e1e3f; --accent: #FFB800;
+  --accent2: #FF6B35; --text: #eeeef6; --text2: #8888aa; --border: #2a2a52;
+  --green: #4ade80; --red: #f87171; --blue: #60a5fa;
+}
+body { background: var(--bg); color: var(--text); font-family: 'Nunito', sans-serif; -webkit-tap-highlight-color: transparent; }
+.app { max-width: 900px; margin: 0 auto; min-height: 100vh; padding-bottom: 80px; }
+h1, h2, h3 { font-family: 'Bebas Neue', sans-serif; letter-spacing: 1px; }
+
+.hero { text-align: center; padding: 28px 16px 12px; }
+.hero h1 { font-size: 2.4em; background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 2px; }
+.hero p { color: var(--text2); font-size: 0.9em; }
+.hero .status { font-size: 0.75em; margin-top: 4px; }
+.status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+.status-dot.online { background: var(--green); }
+.status-dot.offline { background: var(--red); }
+
+.tab-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #0e0e24ee;
+  backdrop-filter: blur(12px); border-top: 1px solid var(--border); display: flex;
+  justify-content: center; gap: 4px; padding: 6px 8px; z-index: 100; }
+.tab-btn { flex: 1; max-width: 100px; background: none; border: none; color: var(--text2);
+  font-family: 'Nunito', sans-serif; font-size: 0.7em; font-weight: 600; padding: 6px 4px;
+  border-radius: 10px; cursor: pointer; display: flex; flex-direction: column;
+  align-items: center; gap: 2px; transition: all 0.2s; }
+.tab-btn.active { color: var(--accent); background: #FFB80015; }
+.tab-btn .icon { font-size: 1.4em; }
+
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+  padding: 16px; margin: 8px 12px; }
+.card h2 { font-size: 1.5em; margin-bottom: 10px; color: var(--accent); }
+
+.info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.info-item { background: var(--card2); border-radius: 10px; padding: 12px; }
+.info-item .label { font-size: 0.75em; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+.info-item .value { font-size: 1.05em; font-weight: 700; }
+
+.place-table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
+.place-table th { text-align: left; padding: 8px 6px; color: var(--text2); font-weight: 600;
+  border-bottom: 1px solid var(--border); font-size: 0.8em; text-transform: uppercase; }
+.place-table td { padding: 7px 6px; border-bottom: 1px solid #1a1a3a; }
+.place-table tr:hover { background: #ffffff06; }
+.check-cell { text-align: center; }
+.check-btn { width: 26px; height: 26px; border-radius: 7px; border: 2px solid var(--border);
+  background: none; cursor: pointer; font-size: 0.85em; display: inline-flex;
+  align-items: center; justify-content: center; transition: all 0.15s; color: var(--green); }
+.check-btn.checked { border-color: var(--green); background: #4ade8025; }
+.cost-input { width: 55px; background: var(--card2); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--text); padding: 3px 5px; font-size: 0.85em;
+  font-family: 'Nunito', sans-serif; text-align: right; }
+.cost-input:focus { outline: none; border-color: var(--accent); }
+.del-btn { background: none; border: none; color: var(--red); cursor: pointer;
+  opacity: 0.5; font-size: 1em; padding: 2px 4px; }
+.del-btn:hover { opacity: 1; }
+
+.add-row { display: flex; gap: 6px; margin-top: 10px; }
+.add-input { flex: 1; background: var(--card2); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text); padding: 8px 10px; font-family: 'Nunito', sans-serif; font-size: 0.9em; }
+.add-input:focus { outline: none; border-color: var(--accent); }
+.add-btn { background: var(--accent); color: #000; border: none; border-radius: 8px;
+  padding: 8px 14px; font-family: 'Nunito', sans-serif; font-weight: 700; cursor: pointer; font-size: 0.9em; white-space: nowrap; }
+.add-btn:hover { background: #e6a600; }
+
+.day-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; margin: 8px 12px; overflow: hidden; }
+.day-header { padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }
+.day-num { font-family: 'Bebas Neue', sans-serif; font-size: 1.8em; color: var(--accent); line-height: 1; margin-right: 10px; }
+.day-body { padding: 0 14px 14px; }
+.cal-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--card2); border-radius: 8px; margin-bottom: 6px; }
+.cal-item-name { flex: 1; font-size: 0.88em; font-weight: 600; }
+.cal-time-input { width: 80px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 5px 8px; font-size: 0.85em; font-family: 'Nunito', sans-serif; }
+.cal-time-input:focus { outline: none; border-color: var(--accent); }
+.cal-time-input::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.5; cursor: pointer; }
+.cal-add-row { display: flex; gap: 6px; margin-top: 8px; align-items: center; flex-wrap: wrap; }
+.cal-select { flex: 1; min-width: 120px; background: var(--card2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 8px 10px; font-family: 'Nunito', sans-serif; font-size: 0.85em; }
+.cal-select:focus { outline: none; border-color: var(--accent); }
+.small-btn { background: var(--accent); color: #000; border: none; border-radius: 8px; padding: 8px 12px; font-family: 'Nunito', sans-serif; font-weight: 700; cursor: pointer; font-size: 0.85em; }
+
+.section-toggle { display: flex; gap: 6px; margin: 8px 12px; }
+.toggle-btn { flex: 1; padding: 8px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); color: var(--text2); font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 0.85em; cursor: pointer; text-align: center; transition: all 0.15s; }
+.toggle-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
+
+.exp-item { background: var(--card2); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
+.exp-top { display: flex; justify-content: space-between; align-items: center; }
+.exp-desc { font-weight: 700; font-size: 0.95em; }
+.exp-amount { font-family: 'Bebas Neue', sans-serif; font-size: 1.3em; color: var(--green); }
+.exp-meta { font-size: 0.78em; color: var(--text2); margin-top: 3px; }
+.exp-form { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.exp-form.full { grid-template-columns: 1fr; }
+.form-label { font-size: 0.75em; color: var(--text2); margin-bottom: 3px; display: block; }
+.form-input { width: 100%; background: var(--card2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 8px 10px; font-family: 'Nunito', sans-serif; font-size: 0.88em; }
+.form-input:focus { outline: none; border-color: var(--accent); }
+.form-select { width: 100%; background: var(--card2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 8px 10px; font-family: 'Nunito', sans-serif; font-size: 0.88em; }
+.people-checks { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+.person-chip { padding: 4px 10px; border-radius: 15px; font-size: 0.75em; font-weight: 700; cursor: pointer; border: 2px solid; transition: all 0.15s; user-select: none; }
+
+.person-balance-card { background: var(--card2); border-radius: 12px; padding: 14px; margin-bottom: 8px; border-left: 4px solid; }
+.person-balance-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.person-balance-name { font-weight: 800; font-size: 1em; display: flex; align-items: center; gap: 8px; }
+.person-balance-amount { font-family: 'Bebas Neue', sans-serif; font-size: 1.6em; }
+
+.settlement-card { background: linear-gradient(135deg, #1a1a40, #252550); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin-top: 12px; }
+.settlement-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.3em; color: var(--accent); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+.settlement-row { display: flex; align-items: center; padding: 12px; background: var(--card2); border-radius: 10px; margin-bottom: 8px; gap: 10px; }
+.settlement-from { display: flex; align-items: center; gap: 6px; font-weight: 700; min-width: 80px; }
+.settlement-arrow-box { background: var(--accent); color: #000; font-weight: 800; padding: 4px 12px; border-radius: 20px; white-space: nowrap; font-family: 'Bebas Neue', sans-serif; font-size: 1.1em; letter-spacing: 1px; }
+.settlement-to { display: flex; align-items: center; gap: 6px; font-weight: 700; min-width: 80px; }
+
+.total-bar { display: flex; justify-content: space-between; padding: 12px 14px; background: var(--accent); color: #000; border-radius: 10px; margin-top: 12px; font-weight: 700; font-size: 0.95em; }
+.empty-state { text-align: center; color: var(--text2); padding: 20px; font-size: 0.9em; }
+.person-avatar { width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 0.7em; font-weight: 800; color: #000; flex-shrink: 0; }
+
+.map-link { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--card2); border-radius: 10px; margin-bottom: 6px; text-decoration: none; color: var(--text); font-size: 0.88em; transition: background 0.15s; font-weight: 600; }
+.map-link:hover { background: #2a2a52; }
+.map-votes { font-size: 0.75em; color: var(--text2); font-weight: 400; }
+
+.costs-sub-toggle { display: flex; gap: 6px; margin: 0 0 12px 0; }
+.costs-sub-btn { flex: 1; padding: 8px 6px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--text2); font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 0.8em; cursor: pointer; text-align: center; transition: all 0.15s; }
+.costs-sub-btn.active { background: var(--card2); color: var(--text); border-color: var(--accent); }
+
+.loading-screen { display: flex; align-items: center; justify-content: center; height: 100vh; flex-direction: column; gap: 12px; }
+.loading-screen .spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.setup-screen { max-width: 500px; margin: 60px auto; padding: 20px; text-align: center; }
+.setup-screen h1 { font-size: 2em; color: var(--accent); margin-bottom: 10px; }
+.setup-screen p { color: var(--text2); margin-bottom: 20px; font-size: 0.9em; line-height: 1.5; }
+.setup-screen code { background: var(--card2); padding: 2px 6px; border-radius: 4px; font-size: 0.85em; color: var(--accent); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+// ==========================================
+// 🔥 FIREBASE CONFIG - WKLEJ SWOJE DANE TUTAJ
+// ==========================================
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBXtFGvopNbrQZx7rLSsm7cNw-esdmev3c",
+  authDomain: "nowy-york-2026.firebaseapp.com",
+  databaseURL: "https://nowy-york-2026-default-rtdb.firebaseio.com",
+  projectId: "nowy-york-2026",
+  storageBucket: "nowy-york-2026.firebasestorage.app",
+  messagingSenderId: "538193093984",
+  appId: "1:538193093984:web:69dd12a8ef2ce5cb172a05"
+};
+// ==========================================
+
+const { useState, useEffect, useCallback, useRef } = React;
+
+const PEOPLE = ["Kandi", "Jarek", "Oliwka", "Jordan"];
+const PEOPLE_COLORS = { Kandi: "#FF6B9D", Jarek: "#51CF66", Oliwka: "#845EF7", Jordan: "#FFB800" };
+
+const DAYS = Array.from({ length: 11 }, (_, i) => {
+  const d = new Date(2026, 4, 3 + i);
+  const weekday = ["Niedz.", "Pon.", "Wt.", "Śr.", "Czw.", "Pt.", "Sob."][d.getDay()];
+  return { date: `2026-05-${String(3 + i).padStart(2, "0")}`, label: `${weekday} ${3 + i} maja`, dayNum: i + 1 };
+});
+
+const DEFAULT_ATTRACTIONS = [
+  "Grand Central Station", "Times Square", "DUMBO", "Brooklyn Bridge", "The Met",
+  "Central Park", "Broadway", "The Rose Reading Room", "The Morgan Library",
+  "Chinatown", "Statue of Liberty", "Staten Island Ferry", "Walmart", "Roosevelt Island Tramway"
+];
+const DEFAULT_FOOD = [
+  "Raising Cane's", "Crumbl Cookies", "Joe's Pizza", "Carlo's Bakery Times Square",
+  "BTS Bagel", "Chipotle", "Chick-fil-A", "Cheesecake Factory", "7-Eleven", "Diner 24", "Black Tap"
+];
+
+const initVotes = () => Object.fromEntries(PEOPLE.map(p => [p, false]));
+const CATEGORIES = {
+  transport: { icon: "🚇", label: "Transport" }, jedzenie: { icon: "🍕", label: "Jedzenie" },
+  bilety: { icon: "🎫", label: "Bilety" }, zakupy: { icon: "🛍️", label: "Zakupy" }, inne: { icon: "📌", label: "Inne" },
+};
+
+const DEFAULT_DATA = {
+  attractions: DEFAULT_ATTRACTIONS.map((name, i) => ({ id: `a${i}`, name, votes: initVotes(), cost: 0 })),
+  food: DEFAULT_FOOD.map((name, i) => ({ id: `f${i}`, name, votes: initVotes(), cost: 0 })),
+  calendar: Object.fromEntries(DAYS.map(d => [d.date, []])),
+  expenses: [],
+};
+
+const TABS = [
+  { id: "dash", icon: "🗽", label: "Start" }, { id: "cal", icon: "📅", label: "Kalendarz" },
+  { id: "places", icon: "✅", label: "Atrakcje" }, { id: "costs", icon: "💰", label: "Koszty" },
+  { id: "map", icon: "🗺️", label: "Mapa" },
+];
+
+// Firebase init
+let db = null;
+let firebaseReady = false;
+try {
+  if (FIREBASE_CONFIG.apiKey !== "TWOJ_API_KEY") {
+    firebase.initializeApp(FIREBASE_CONFIG);
+    db = firebase.database();
+    firebaseReady = true;
+  }
+} catch (e) { console.error("Firebase init error:", e); }
+
+function App() {
+  const [tab, setTab] = useState("dash");
+  const [data, setData] = useState(DEFAULT_DATA);
+  const [loaded, setLoaded] = useState(false);
+  const [connected, setConnected] = useState(false);
+  const [placesTab, setPlacesTab] = useState("attractions");
+  const [newAttr, setNewAttr] = useState("");
+  const [newFood, setNewFood] = useState("");
+  const [openDays, setOpenDays] = useState({ "2026-05-03": true });
+  const [costsView, setCostsView] = useState("add");
+  const [expForm, setExpForm] = useState({ desc: "", amount: "", paidBy: "Jordan", split: [...PEOPLE], date: DAYS[0].date, category: "inne" });
+  const skipNextUpdate = useRef(false);
+
+  // If Firebase not configured, show setup screen
+  if (!firebaseReady) {
+    return (
+      <div className="setup-screen">
+        <div style={{ fontSize: "3em", marginBottom: 10 }}>🗽</div>
+        <h1>NYC TRIP 2026</h1>
+        <p>Firebase nie jest jeszcze skonfigurowane.<br/>
+        Otwórz plik <code>index.html</code> i wklej swoje dane Firebase w sekcji <code>FIREBASE_CONFIG</code> na górze pliku.<br/><br/>
+        Szczegóły jak to zrobić znajdziesz w pliku <code>INSTRUKCJA.md</code></p>
+      </div>
+    );
+  }
+
+  // Firebase real-time listener
+  useEffect(() => {
+    const ref = db.ref("trip");
+    // Listen for connection state
+    db.ref(".info/connected").on("value", snap => setConnected(!!snap.val()));
+    // Listen for data changes
+    ref.on("value", snap => {
+      if (skipNextUpdate.current) { skipNextUpdate.current = false; return; }
+      const val = snap.val();
+      if (val) {
+        // Firebase converts arrays to objects, fix calendar & expenses
+        const fixed = { ...DEFAULT_DATA, ...val };
+        if (fixed.calendar && typeof fixed.calendar === "object") {
+          Object.keys(fixed.calendar).forEach(k => {
+            if (fixed.calendar[k] && !Array.isArray(fixed.calendar[k])) {
+              fixed.calendar[k] = Object.values(fixed.calendar[k]);
+            }
+            if (!fixed.calendar[k]) fixed.calendar[k] = [];
+          });
+        }
+        if (fixed.expenses && !Array.isArray(fixed.expenses)) {
+          fixed.expenses = Object.values(fixed.expenses);
+        }
+        if (fixed.attractions && !Array.isArray(fixed.attractions)) {
+          fixed.attractions = Object.values(fixed.attractions);
+        }
+        if (fixed.food && !Array.isArray(fixed.food)) {
+          fixed.food = Object.values(fixed.food);
+        }
+        // Fix votes that might be missing
+        ["attractions", "food"].forEach(type => {
+          if (Array.isArray(fixed[type])) {
+            fixed[type] = fixed[type].map(item => ({
+              ...item,
+              votes: { ...initVotes(), ...(item.votes || {}) },
+              cost: item.cost || 0
+            }));
+          }
+        });
+        // Fix expense split arrays
+        if (Array.isArray(fixed.expenses)) {
+          fixed.expenses = fixed.expenses.map(e => ({
+            ...e, split: Array.isArray(e.split) ? e.split : (e.split ? Object.values(e.split) : [...PEOPLE])
+          }));
+        }
+        setData(fixed);
+      } else {
+        // First time — write defaults
+        ref.set(DEFAULT_DATA);
+      }
+      setLoaded(true);
+    });
+    return () => ref.off();
+  }, []);
+
+  const saveData = useCallback((newData) => {
+    setData(newData);
+    skipNextUpdate.current = true;
+    db.ref("trip").set(newData);
+  }, []);
+
+  // --- Logic ---
+  const toggleVote = (type, id, person) => {
+    const list = [...data[type]];
+    const idx = list.findIndex(x => x.id === id);
+    if (idx < 0) return;
+    list[idx] = { ...list[idx], votes: { ...list[idx].votes, [person]: !list[idx].votes[person] } };
+    saveData({ ...data, [type]: list });
+  };
+
+  const setCostVal = (type, id, cost) => {
+    const list = [...data[type]];
+    const idx = list.findIndex(x => x.id === id);
+    if (idx < 0) return;
+    list[idx] = { ...list[idx], cost: parseFloat(cost) || 0 };
+    saveData({ ...data, [type]: list });
+  };
+
+  const addPlace = (type) => {
+    const name = type === "attractions" ? newAttr.trim() : newFood.trim();
+    if (!name) return;
+    if (data[type].some(x => x.name.toLowerCase() === name.toLowerCase())) return;
+    const id = `${type[0]}${Date.now()}`;
+    saveData({ ...data, [type]: [...data[type], { id, name, votes: initVotes(), cost: 0 }] });
+    type === "attractions" ? setNewAttr("") : setNewFood("");
+  };
+
+  const removePlace = (type, id) => saveData({ ...data, [type]: data[type].filter(x => x.id !== id) });
+
+  const ensureAttractionExists = (name, d) => {
+    const all = [...d.attractions, ...d.food].map(x => x.name.toLowerCase());
+    if (all.includes(name.toLowerCase())) return d;
+    return { ...d, attractions: [...d.attractions, { id: `a${Date.now()}`, name, votes: initVotes(), cost: 0 }] };
+  };
+
+  const addToCalendar = (date, name, time) => {
+    if (!name) return;
+    let nd = { ...data, calendar: { ...data.calendar } };
+    const items = [...(nd.calendar[date] || [])];
+    items.push({ id: `ci${Date.now()}`, name, time: time || "09:00" });
+    items.sort((a, b) => a.time.localeCompare(b.time));
+    nd.calendar[date] = items;
+    nd = ensureAttractionExists(name, nd);
+    saveData(nd);
+  };
+
+  const removeFromCalendar = (date, id) => {
+    const cal = { ...data.calendar };
+    cal[date] = (cal[date] || []).filter(x => x.id !== id);
+    saveData({ ...data, calendar: cal });
+  };
+
+  const updateCalTime = (date, id, time) => {
+    const cal = { ...data.calendar };
+    cal[date] = (cal[date] || []).map(x => x.id === id ? { ...x, time } : x);
+    cal[date].sort((a, b) => a.time.localeCompare(b.time));
+    saveData({ ...data, calendar: cal });
+  };
+
+  const addExpense = () => {
+    if (!expForm.desc || !expForm.amount || expForm.split.length === 0) return;
+    const exp = {
+      id: `e${Date.now()}`, desc: expForm.desc, amount: parseFloat(expForm.amount),
+      paidBy: expForm.paidBy, split: [...expForm.split], date: expForm.date, category: expForm.category,
+    };
+    saveData({ ...data, expenses: [...data.expenses, exp] });
+    setExpForm({ ...expForm, desc: "", amount: "" });
+  };
+
+  const removeExpense = (id) => saveData({ ...data, expenses: data.expenses.filter(x => x.id !== id) });
+
+  const getBalances = () => {
+    const bal = Object.fromEntries(PEOPLE.map(p => [p, 0]));
+    const paid = Object.fromEntries(PEOPLE.map(p => [p, 0]));
+    const owes = Object.fromEntries(PEOPLE.map(p => [p, 0]));
+    (data.expenses || []).forEach(e => {
+      const splitArr = Array.isArray(e.split) ? e.split : [...PEOPLE];
+      const share = e.amount / splitArr.length;
+      paid[e.paidBy] += e.amount;
+      bal[e.paidBy] += e.amount;
+      splitArr.forEach(p => { owes[p] += share; bal[p] -= share; });
+    });
+    return { bal, paid, owes };
+  };
+
+  const getSettlements = () => {
+    const { bal } = getBalances();
+    const debtors = PEOPLE.filter(p => bal[p] < -0.01).map(p => ({ name: p, amount: -bal[p] }));
+    const creditors = PEOPLE.filter(p => bal[p] > 0.01).map(p => ({ name: p, amount: bal[p] }));
+    debtors.sort((a, b) => b.amount - a.amount);
+    creditors.sort((a, b) => b.amount - a.amount);
+    const s = []; let di = 0, ci = 0;
+    while (di < debtors.length && ci < creditors.length) {
+      const amt = Math.min(debtors[di].amount, creditors[ci].amount);
+      if (amt > 0.01) s.push({ from: debtors[di].name, to: creditors[ci].name, amount: amt });
+      debtors[di].amount -= amt; creditors[ci].amount -= amt;
+      if (debtors[di].amount < 0.01) di++;
+      if (creditors[ci].amount < 0.01) ci++;
+    }
+    return s;
+  };
+
+  const totalExpenses = (data.expenses || []).reduce((s, e) => s + e.amount, 0);
+  const allPlaceNames = [...(data.attractions || []).map(a => a.name), ...(data.food || []).map(f => f.name)];
+
+  if (!loaded) return (
+    <div className="loading-screen">
+      <div style={{ fontSize: "2.5em" }}>🗽</div>
+      <div className="spinner"></div>
+      <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "1.2em", letterSpacing: 2, color: "var(--text2)" }}>Łączenie z bazą...</div>
+    </div>
+  );
+
+  return (
+    <div className="app">
+      <div className="hero">
+        <h1>NYC TRIP 2026</h1>
+        <p>3-13 maja • Kandi, Jarek, Oliwka, Jordan</p>
+        <div className="status">
+          <span className={`status-dot ${connected ? "online" : "offline"}`}></span>
+          <span style={{ color: "var(--text2)", fontSize: "0.85em" }}>
+            {connected ? "Połączono — zmiany na żywo" : "Offline — zmiany zapiszą się po połączeniu"}
+          </span>
+        </div>
+      </div>
+
+      {/* DASHBOARD */}
+      {tab === "dash" && <>
+        <div className="card">
+          <h2>📍 INFO</h2>
+          <div className="info-grid">
+            <div className="info-item"><div className="label">Przylot</div><div className="value">3 maja, 12:40</div></div>
+            <div className="info-item"><div className="label">Powrót</div><div className="value">13 maja</div></div>
+            <div className="info-item"><div className="label">Noclegi</div><div className="value">Airbnb, Union City NJ</div></div>
+            <div className="info-item"><div className="label">Koszt noclegów</div><div className="value">400 €/os.</div></div>
+            <div className="info-item"><div className="label">Łączne wydatki</div><div className="value" style={{ color: "var(--green)" }}>${totalExpenses.toFixed(2)}</div></div>
+            <div className="info-item"><div className="label">Średnio na osobę</div><div className="value">${(totalExpenses / 4).toFixed(2)}</div></div>
+          </div>
+        </div>
+        <div className="card">
+          <h2>👥 EKIPA</h2>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {PEOPLE.map(p => (
+              <div key={p} style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--card2)", borderRadius: 10, padding: "8px 14px" }}>
+                <div className="person-avatar" style={{ background: PEOPLE_COLORS[p] }}>{p[0]}</div>
+                <span style={{ fontWeight: 700, fontSize: "0.9em" }}>{p}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="card">
+          <h2>📊 PODSUMOWANIE</h2>
+          <div className="info-grid">
+            <div className="info-item"><div className="label">Atrakcje</div><div className="value">{(data.attractions||[]).length}</div></div>
+            <div className="info-item"><div className="label">Jedzenie</div><div className="value">{(data.food||[]).length}</div></div>
+            <div className="info-item"><div className="label">Zaplanowane aktywności</div><div className="value">{Object.values(data.calendar||{}).flat().length}</div></div>
+            <div className="info-item"><div className="label">Wydatki zapisane</div><div className="value">{(data.expenses||[]).length}</div></div>
+          </div>
+        </div>
+      </>}
+
+      {/* CALENDAR */}
+      {tab === "cal" && <>
+        <div style={{ padding: "4px 12px" }}>
+          <h2 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "1.5em", color: "var(--accent)" }}>📅 KALENDARZ</h2>
+        </div>
+        {DAYS.map(day => {
+          const items = data.calendar[day.date] || [];
+          const isOpen = !!openDays[day.date];
+          return (
+            <div className="day-card" key={day.date}>
+              <div className="day-header" onClick={() => setOpenDays(o => ({ ...o, [day.date]: !o[day.date] }))}>
+                <div style={{ display: "flex", alignItems: "center" }}>
+                  <span className="day-num">{day.dayNum}</span>
+                  <div>
+                    <h3 style={{ margin: 0 }}>{day.label}</h3>
+                    <span style={{ fontSize: "0.75em", color: "var(--text2)" }}>{items.length > 0 ? `${items.length} aktywności` : "Brak planów"}</span>
+                  </div>
+                </div>
+                <span style={{ fontSize: "1.2em", color: "var(--text2)" }}>{isOpen ? "▲" : "▼"}</span>
+              </div>
+              {isOpen && (
+                <div className="day-body">
+                  {items.map(item => (
+                    <div className="cal-item" key={item.id}>
+                      <input type="time" className="cal-time-input" value={item.time} onChange={e => updateCalTime(day.date, item.id, e.target.value)} />
+                      <span className="cal-item-name">{item.name}</span>
+                      <button className="del-btn" onClick={() => removeFromCalendar(day.date, item.id)}>✕</button>
+                    </div>
+                  ))}
+                  <CalendarAddRow places={allPlaceNames} onAdd={(n, t) => addToCalendar(day.date, n, t)} />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </>}
+
+      {/* PLACES */}
+      {tab === "places" && <>
+        <div className="section-toggle">
+          <button className={`toggle-btn ${placesTab === "attractions" ? "active" : ""}`} onClick={() => setPlacesTab("attractions")}>🏛️ Atrakcje ({(data.attractions||[]).length})</button>
+          <button className={`toggle-btn ${placesTab === "food" ? "active" : ""}`} onClick={() => setPlacesTab("food")}>🍔 Jedzenie ({(data.food||[]).length})</button>
+        </div>
+        <div className="card" style={{ overflowX: "auto" }}>
+          <table className="place-table">
+            <thead><tr>
+              <th style={{ minWidth: 130 }}>{placesTab === "attractions" ? "Atrakcja" : "Jedzenie"}</th>
+              {PEOPLE.map(p => <th key={p} className="check-cell" style={{ minWidth: 50 }}><div className="person-avatar" style={{ background: PEOPLE_COLORS[p], margin: "0 auto" }}>{p[0]}</div></th>)}
+              <th style={{ minWidth: 55 }}>$/os</th>
+              <th style={{ width: 30 }}></th>
+            </tr></thead>
+            <tbody>
+              {(data[placesTab]||[]).map(item => (
+                <tr key={item.id}>
+                  <td style={{ fontWeight: 600, fontSize: "0.9em" }}>{item.name}</td>
+                  {PEOPLE.map(p => (
+                    <td key={p} className="check-cell">
+                      <button className={`check-btn ${item.votes[p] ? "checked" : ""}`} onClick={() => toggleVote(placesTab, item.id, p)}>
+                        {item.votes[p] ? "✓" : ""}
+                      </button>
+                    </td>
+                  ))}
+                  <td><input type="number" className="cost-input" value={item.cost || ""} placeholder="0" min="0" onChange={e => setCostVal(placesTab, item.id, e.target.value)} /></td>
+                  <td><button className="del-btn" onClick={() => removePlace(placesTab, item.id)}>✕</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="add-row">
+            <input className="add-input" placeholder={`Dodaj ${placesTab === "attractions" ? "atrakcję" : "jedzenie"}...`}
+              value={placesTab === "attractions" ? newAttr : newFood}
+              onChange={e => placesTab === "attractions" ? setNewAttr(e.target.value) : setNewFood(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && addPlace(placesTab)} />
+            <button className="add-btn" onClick={() => addPlace(placesTab)}>+ Dodaj</button>
+          </div>
+        </div>
+      </>}
+
+      {/* COSTS */}
+      {tab === "costs" && <>
+        <div className="card" style={{ paddingBottom: 8 }}>
+          <div className="costs-sub-toggle">
+            <button className={`costs-sub-btn ${costsView === "add" ? "active" : ""}`} onClick={() => setCostsView("add")}>➕ Dodaj</button>
+            <button className={`costs-sub-btn ${costsView === "list" ? "active" : ""}`} onClick={() => setCostsView("list")}>📝 Lista ({(data.expenses||[]).length})</button>
+            <button className={`costs-sub-btn ${costsView === "balance" ? "active" : ""}`} onClick={() => setCostsView("balance")}>⚖️ Rozliczenie</button>
+          </div>
+        </div>
+
+        {costsView === "add" && (
+          <div className="card">
+            <h2>➕ NOWY WYDATEK</h2>
+            <div className="exp-form">
+              <div><label className="form-label">Opis</label><input className="form-input" value={expForm.desc} onChange={e => setExpForm({...expForm, desc: e.target.value})} placeholder="np. Metro pass, pizza..." /></div>
+              <div><label className="form-label">Kwota ($)</label><input className="form-input" type="number" value={expForm.amount} onChange={e => setExpForm({...expForm, amount: e.target.value})} placeholder="0.00" min="0" step="0.01" /></div>
+              <div><label className="form-label">Zapłacił/a</label><select className="form-select" value={expForm.paidBy} onChange={e => setExpForm({...expForm, paidBy: e.target.value})}>{PEOPLE.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
+              <div><label className="form-label">Kategoria</label><select className="form-select" value={expForm.category} onChange={e => setExpForm({...expForm, category: e.target.value})}>{Object.entries(CATEGORIES).map(([k,v]) => <option key={k} value={k}>{v.icon} {v.label}</option>)}</select></div>
+              <div><label className="form-label">Dzień</label><select className="form-select" value={expForm.date} onChange={e => setExpForm({...expForm, date: e.target.value})}>{DAYS.map(d => <option key={d.date} value={d.date}>{d.label}</option>)}</select></div>
+            </div>
+            <div style={{ marginTop: 10 }}>
+              <label className="form-label">Dzielone między</label>
+              <div className="people-checks">
+                {PEOPLE.map(p => (
+                  <span key={p} className="person-chip" style={{ borderColor: PEOPLE_COLORS[p], background: expForm.split.includes(p) ? PEOPLE_COLORS[p]+"30" : "transparent", color: PEOPLE_COLORS[p], opacity: expForm.split.includes(p) ? 1 : 0.35 }}
+                    onClick={() => { const s = expForm.split.includes(p) ? expForm.split.filter(x=>x!==p) : [...expForm.split, p]; setExpForm({...expForm, split: s}); }}>{p}</span>
+                ))}
+              </div>
+            </div>
+            <div style={{ marginTop: 14 }}><button className="add-btn" style={{ width: "100%", padding: 12, fontSize: "1em" }} onClick={addExpense}>+ Dodaj wydatek</button></div>
+          </div>
+        )}
+
+        {costsView === "list" && (
+          <div className="card">
+            <h2>📝 WSZYSTKIE WYDATKI</h2>
+            {(data.expenses||[]).length === 0 && <div className="empty-state">Brak wydatków. Dodaj pierwszy!</div>}
+            {[...(data.expenses||[])].reverse().map(e => (
+              <div className="exp-item" key={e.id}>
+                <div className="exp-top">
+                  <div>
+                    <div className="exp-desc">{CATEGORIES[e.category]?.icon || "📌"} {e.desc}</div>
+                    <div className="exp-meta">Zapłacił/a: <span style={{ color: PEOPLE_COLORS[e.paidBy], fontWeight: 700 }}>{e.paidBy}</span> • Dzielone: {(Array.isArray(e.split) ? e.split : []).join(", ")} • {DAYS.find(d => d.date === e.date)?.label || e.date}</div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span className="exp-amount">${e.amount.toFixed(2)}</span>
+                    <button className="del-btn" onClick={() => removeExpense(e.id)}>✕</button>
+                  </div>
+                </div>
+              </div>
+            ))}
+            <div className="total-bar"><span>Łącznie</span><span>${totalExpenses.toFixed(2)}</span></div>
+          </div>
+        )}
+
+        {costsView === "balance" && <>
+          <div className="card">
+            <h2>👤 KAŻDA OSOBA</h2>
+            <p style={{ fontSize: "0.78em", color: "var(--text2)", marginBottom: 12 }}>Zielony = inni ci są winni • Czerwony = jesteś winien/winna</p>
+            {PEOPLE.map(p => {
+              const { bal, paid, owes } = getBalances();
+              const isPlus = bal[p] >= 0;
+              return (
+                <div key={p} className="person-balance-card" style={{ borderLeftColor: PEOPLE_COLORS[p] }}>
+                  <div className="person-balance-header">
+                    <div className="person-balance-name"><div className="person-avatar" style={{ background: PEOPLE_COLORS[p] }}>{p[0]}</div>{p}</div>
+                    <div className="person-balance-amount" style={{ color: isPlus ? "var(--green)" : "var(--red)" }}>${Math.abs(bal[p]).toFixed(2)}</div>
+                  </div>
+                  <div style={{ fontSize: "0.82em", fontWeight: 700, marginBottom: 4, color: isPlus ? "var(--green)" : "var(--red)" }}>
+                    {Math.abs(bal[p]) < 0.01 ? "✅ Rozliczony/a" : isPlus ? "👈 Inni są winni" : "👉 Jest winien/winna grupie"}
+                  </div>
+                  <div style={{ fontSize: "0.78em", color: "var(--text2)" }}>Zapłacił/a: <strong>${paid[p].toFixed(2)}</strong> • Powinien/na: <strong>${owes[p].toFixed(2)}</strong></div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="card" style={{ background: "transparent", border: "none", padding: 0, margin: "0 12px" }}>
+            <div className="settlement-card">
+              <div className="settlement-title">💸 KTO KOMU PŁACI</div>
+              {getSettlements().length === 0 && <div className="empty-state">Wszystko wyrównane!</div>}
+              {getSettlements().map((s, i) => (
+                <div className="settlement-row" key={i}>
+                  <div className="settlement-from"><div className="person-avatar" style={{ background: PEOPLE_COLORS[s.from] }}>{s.from[0]}</div><span style={{ color: PEOPLE_COLORS[s.from] }}>{s.from}</span></div>
+                  <div className="settlement-arrow-box">${s.amount.toFixed(2)} →</div>
+                  <div className="settlement-to"><div className="person-avatar" style={{ background: PEOPLE_COLORS[s.to] }}>{s.to[0]}</div><span style={{ color: PEOPLE_COLORS[s.to] }}>{s.to}</span></div>
+                </div>
+              ))}
+              <div style={{ marginTop: 10, fontSize: "0.78em", color: "var(--text2)", textAlign: "center" }}>Po tych przelewach wszyscy będą rozliczeni</div>
+            </div>
+          </div>
+          <div className="card"><div className="total-bar"><span>Łączne wydatki grupy</span><span>${totalExpenses.toFixed(2)}</span></div>
+            <div style={{ textAlign: "center", marginTop: 8, fontSize: "0.82em", color: "var(--text2)" }}>Średnio ${(totalExpenses / 4).toFixed(2)} na osobę</div>
+          </div>
+        </>}
+      </>}
+
+      {/* MAP */}
+      {tab === "map" && <>
+        <div className="card">
+          <h2>🗺️ ATRAKCJE</h2>
+          <p style={{ fontSize: "0.8em", color: "var(--text2)", marginBottom: 10 }}>Kliknij żeby otworzyć w Google Maps</p>
+          {(data.attractions||[]).map(a => {
+            const voted = PEOPLE.filter(p => a.votes[p]);
+            return (
+              <a key={a.id} className="map-link" href={`https://www.google.com/maps/search/${encodeURIComponent(a.name + " New York")}`} target="_blank" rel="noopener">
+                <span style={{ fontSize: "1.2em" }}>📍</span>
+                <div style={{ flex: 1 }}><div>{a.name}</div>{voted.length > 0 && <div className="map-votes">Chcą: {voted.map(p => <span key={p} style={{ color: PEOPLE_COLORS[p], marginRight: 4, fontWeight: 600 }}>{p}</span>)}</div>}</div>
+                <span style={{ color: "var(--text2)" }}>→</span>
+              </a>
+            );
+          })}
+        </div>
+        <div className="card">
+          <h2>🍽️ JEDZENIE</h2>
+          {(data.food||[]).map(f => {
+            const voted = PEOPLE.filter(p => f.votes[p]);
+            return (
+              <a key={f.id} className="map-link" href={`https://www.google.com/maps/search/${encodeURIComponent(f.name + " New York")}`} target="_blank" rel="noopener">
+                <span style={{ fontSize: "1.2em" }}>🍴</span>
+                <div style={{ flex: 1 }}><div>{f.name}</div>{voted.length > 0 && <div className="map-votes">Chcą: {voted.map(p => <span key={p} style={{ color: PEOPLE_COLORS[p], marginRight: 4, fontWeight: 600 }}>{p}</span>)}</div>}</div>
+                <span style={{ color: "var(--text2)" }}>→</span>
+              </a>
+            );
+          })}
+        </div>
+        <div className="card">
+          <h2>🏠 AIRBNB</h2>
+          <a className="map-link" href="https://www.google.com/maps/search/1807+John+F.+Kennedy+Boulevard+Union+City+NJ+07087" target="_blank" rel="noopener">
+            <span style={{ fontSize: "1.2em" }}>🏡</span>
+            <div style={{ flex: 1 }}><div>1807 JFK Boulevard, Union City, NJ</div><div className="map-votes">Airbnb - baza wypadowa</div></div>
+            <span style={{ color: "var(--text2)" }}>→</span>
+          </a>
+        </div>
+      </>}
+
+      {/* TAB BAR */}
+      <div className="tab-bar">
+        {TABS.map(t => (
+          <button key={t.id} className={`tab-btn ${tab === t.id ? "active" : ""}`} onClick={() => setTab(t.id)}>
+            <span className="icon">{t.icon}</span>{t.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CalendarAddRow({ places, onAdd }) {
+  const [sel, setSel] = useState("");
+  const [custom, setCustom] = useState("");
+  const [time, setTime] = useState("09:00");
+  const isCustom = sel === "__custom__";
+  const handleAdd = () => {
+    const name = isCustom ? custom.trim() : sel;
+    if (name) { onAdd(name, time); setSel(""); setCustom(""); }
+  };
+  return (
+    <div className="cal-add-row">
+      <select className="cal-select" value={sel} onChange={e => setSel(e.target.value)}>
+        <option value="">Wybierz aktywność...</option>
+        {places.map((p, i) => <option key={i} value={p}>{p}</option>)}
+        <option value="__custom__">✏️ Własna...</option>
+      </select>
+      {isCustom && <input className="add-input" style={{ minWidth: 100 }} value={custom} onChange={e => setCustom(e.target.value)} placeholder="Wpisz nazwę..." onKeyDown={e => e.key === "Enter" && handleAdd()} />}
+      <input type="time" className="cal-time-input" value={time} onChange={e => setTime(e.target.value)} />
+      <button className="small-btn" onClick={handleAdd}>+</button>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App />);
+</script>
+</body>
+</html>
