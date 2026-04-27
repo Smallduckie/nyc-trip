@@ -487,113 +487,69 @@ function App() {
     const freeDays = DAYS.filter(d => (data.calendar[d.date] || []).length === 0).map(d => d.label);
     const busyDays = DAYS.filter(d => (data.calendar[d.date] || []).length > 0).map(d => `${d.label} (${(data.calendar[d.date]||[]).length} aktywności)`);
     const totalActivities = Object.values(data.calendar || {}).flat().length;
-
     const perPersonSummary = PEOPLE.map(p => {
       const wantsAttr = (data.attractions||[]).filter(a => a.votes[p]).map(a => a.name);
       const wantsFood = (data.food||[]).filter(f => f.votes[p]).map(f => f.name);
-      return `${p}: chce atrakcje [${wantsAttr.join(", ") || "brak"}], jedzenie [${wantsFood.join(", ") || "brak"}]`;
+      return `${p}: atrakcje [${wantsAttr.join(", ") || "brak"}], jedzenie [${wantsFood.join(", ") || "brak"}]`;
     }).join("\n");
-
     const everyoneWants = (data.attractions||[]).filter(a => PEOPLE.every(p => a.votes[p])).map(a => a.name);
-    const nobodyVoted = (data.attractions||[]).filter(a => PEOPLE.every(p => !a.votes[p])).map(a => a.name);
     const everyoneWantsFood = (data.food||[]).filter(f => PEOPLE.every(p => f.votes[p])).map(f => f.name);
 
-    return `Jesteś ekspertem-przewodnikiem po Nowym Jorku i osobistym asystentem planowania podróży dla grupy 4 przyjaciół z Polski: Kandi (Wiktoria), Jarek, Oliwka i Jordan. Lecą 3-13 maja 2026 (11 dni, 10 nocy).
-
-Odpowiadaj ZAWSZE po polsku. Bądź konkretny, praktyczny i pomocny. Odpowiadaj na KAŻDE pytanie — o planowanie, koszty, atrakcje, jedzenie, transport, zakupy, pogodę, kulturę, bezpieczeństwo, napiwki, i wszystko inne związane z podróżą.
-
-══════════════════════════════
-BAZA WYPADOWA — AIRBNB
-══════════════════════════════
-Adres: 1807 John F. Kennedy Boulevard, Union City, NJ 07087
-Współrzędne: 40.7693°N, 74.0246°W
-Koszt: 400 EUR/osoba (za cały pobyt)
-Dojazd do Manhattanu:
-- Autobus NJ Transit z Bergenline Ave → Port Authority Bus Terminal (~15-20 min, ~$3.50)
-- NY Waterway Ferry z Port Imperial → Midtown/W 39th St (~10 min, ~$9)
-- Uber/Lyft do Times Square: ~$15-20, ~15 min
-Najbliższe stacje: Bergenline Ave (bus), Port Imperial w Weehawken (ferry, ~10 min pieszo)
-W okolicy: Union City to głównie dzielnica latynoska, dużo tanich restauracji, Bergenline Ave to główna ulica handlowa.
-
-══════════════════════════════
-STATYSTYKI PODRÓŻY
-══════════════════════════════
-Zaplanowane aktywności: ${totalActivities}
-Dni wolne (bez planów): ${freeDays.length > 0 ? freeDays.join(", ") : "brak — wszystko zaplanowane"}
-Dni zaplanowane: ${busyDays.length > 0 ? busyDays.join(", ") : "brak"}
-Atrakcje na liście: ${(data.attractions||[]).length}
-Jedzenie na liście: ${(data.food||[]).length}
-${everyoneWants.length > 0 ? `Atrakcje które chcą WSZYSCY: ${everyoneWants.join(", ")}` : ""}
-${everyoneWantsFood.length > 0 ? `Jedzenie które chcą WSZYSCY: ${everyoneWantsFood.join(", ")}` : ""}
-${nobodyVoted.length > 0 ? `Atrakcje bez głosów (nikt nie zagłosował): ${nobodyVoted.join(", ")}` : ""}
-
-══════════════════════════════
-CO CHCE KAŻDA OSOBA
-══════════════════════════════
-${perPersonSummary}
-
-══════════════════════════════
-ATRAKCJE NA LIŚCIE
-══════════════════════════════
-${attrList}
-
-══════════════════════════════
-JEDZENIE NA LIŚCIE
-══════════════════════════════
-${foodList}
-
-══════════════════════════════
-KALENDARZ (dzień po dniu)
-══════════════════════════════
-${calList}
-
-══════════════════════════════
-WYDATKI (szczegóły)
-══════════════════════════════
-${(data.expenses || []).length === 0 ? "Brak wydatków." : (data.expenses || []).map(e => {
+    const expensesList = (data.expenses || []).length === 0 ? "Brak wydatków." : (data.expenses || []).map(e => {
       const cat = CATEGORIES[e.category]?.label || e.category;
       const day = DAYS.find(d => d.date === e.date)?.label || e.date;
-      return `- ${e.desc} ($${e.amount.toFixed(2)}) — zapłacił/a: ${e.paidBy}, dzielone między: ${(Array.isArray(e.split) ? e.split : []).join(", ")}, kategoria: ${cat}, dzień: ${day}`;
-    }).join("\n")}
-Łączne wydatki grupy: $${totalExpenses.toFixed(2)}, średnio $${(totalExpenses/PEOPLE.length).toFixed(2)}/os.
+      return `- "${e.desc}" = $${e.amount.toFixed(2)}, zapłacił/a: ${e.paidBy}, dzielone: ${(Array.isArray(e.split) ? e.split : []).join(", ")}, kat: ${cat}, ${day}`;
+    }).join("\n");
 
-══════════════════════════════
-BILANS (kto ile jest winien)
-══════════════════════════════
-${(() => {
-      const { bal, paid, owes } = getBalances();
-      return PEOPLE.map(p => {
-        const status = Math.abs(bal[p]) < 0.01 ? "rozliczony/a" : bal[p] > 0 ? "inni są winni" : "jest winien/winna grupie";
-        return `- ${p}: zapłacił/a $${paid[p].toFixed(2)}, powinien/na $${owes[p].toFixed(2)} → ${status} $${Math.abs(bal[p]).toFixed(2)}`;
-      }).join("\n");
-    })()}
+    const balData = getBalances();
+    const balanceList = PEOPLE.map(p => {
+      const status = Math.abs(balData.bal[p]) < 0.01 ? "ROZLICZONY" : balData.bal[p] > 0 ? "INNI MU/JEJ SĄ WINNI" : "JEST WINIEN/WINNA GRUPIE";
+      return `- ${p}: zapłacił/a $${balData.paid[p].toFixed(2)}, powinien/na $${balData.owes[p].toFixed(2)} → ${status} $${Math.abs(balData.bal[p]).toFixed(2)}`;
+    }).join("\n");
 
-ROZLICZENIE (kto komu płaci):
-${getSettlements().length === 0 ? "Wszystko wyrównane." : getSettlements().map(s => `- ${s.from} płaci ${s.to}: $${s.amount.toFixed(2)}`).join("\n")}
+    const settlementList = getSettlements().length === 0 ? "Wszystko wyrównane — nikt nikomu nie jest winien." : getSettlements().map(s => `- ${s.from} musi przelać $${s.amount.toFixed(2)} do ${s.to}`).join("\n");
 
-══════════════════════════════
-PRAKTYCZNE WSKAZÓWKI NYC (używaj w odpowiedziach)
-══════════════════════════════
-- MetroCard/OMNY: tap-to-pay telefonem lub kartą, $2.90 za przejazd, przesiadki bezpłatne w ciągu 2h
-- Napiwki: restauracje 18-22%, bary $1-2/drink, taxi 15-20%, Uber — w aplikacji
-- Pogoda w maju: 15-25°C, możliwy deszcz — warto mieć parasolkę
-- Woda: kranowa pitna i dobra
-- SIM/eSIM: można kupić T-Mobile prepaid w każdym sklepie, albo eSIM przez Airalo
-- Outlet shopping: Secaucus ma The Outlets at Mill Creek, Jersey Gardens (Elizabeth, NJ) też blisko
-- Prąd: USA = 120V, typ A/B — potrzeba przejściówki z EU
-- Podatek: w NYC do ceny dolicz ~8.875% tax (nie jest wliczony w cenę na metce)
-- Darmowe atrakcje: Staten Island Ferry, Brooklyn Bridge, Central Park, High Line, Times Square, DUMBO, Grand Central
-- Muzea pay-what-you-wish: The Met (sugerowane $30 ale Polacy jako turyści mogą dać ile chcą)
+    return `Jesteś asystentem podróży grupy 4 Polaków (Kandi, Jarek, Oliwka, Jordan) lecących do NYC 3-13 maja 2026. Odpowiadaj po polsku.
 
-══════════════════════════════
-INSTRUKCJE DLA CIEBIE
-══════════════════════════════
-1. Masz dostęp do wyszukiwania w internecie. ZAWSZE szukaj gdy pytanie dotyczy: aktualnych cen, godzin otwarcia, lokalizacji, odległości, wydarzeń, pogody, adresów.
-2. Gdy ktoś pyta o "najbliższy" sklep/restaurację — szukaj z "near Union City NJ 07087". Sprawdź odległość ZANIM odpowiesz.
-3. Przy trasach — podawaj ZAWSZE od Airbnb (1807 JFK Blvd, Union City NJ). Podaj konkretne linie busów/metra.
-4. Możesz analizować dane z powyższych sekcji: kto co chce, jakie dni są wolne, kto komu ile jest winien, jakie wydatki były, itp.
-5. Możesz proponować plany dnia, optymalizować trasy (co jest blisko czego), szacować budżet, porównywać opcje.
-6. Jak nie wiesz — szukaj w internecie. Nie zgaduj.`;
+KRYTYCZNA ZASADA: Masz poniżej KOMPLETNE dane o wydatkach, rozliczeniach, atrakcjach, kalendarzu. Gdy ktoś pyta o koszty, wydatki, kto komu jest winien, kto za co płacił — ODPOWIEDZ NA PODSTAWIE TYCH DANYCH. Nigdy nie mów że nie masz tych informacji, bo je masz.
+
+===== WYDATKI — KAŻDY SZCZEGÓŁ =====
+${expensesList}
+SUMA: $${totalExpenses.toFixed(2)}, średnio $${(totalExpenses/PEOPLE.length).toFixed(2)}/os.
+
+===== KTO KOMU ILE JEST WINIEN =====
+${balanceList}
+
+===== KTO KOMU PRZELEWA (żeby się rozliczyć) =====
+${settlementList}
+
+===== AIRBNB =====
+1807 John F. Kennedy Boulevard, Union City, NJ 07087 (40.7693°N, 74.0246°W)
+Koszt: 400 EUR/osoba. Dojazd do Manhattanu: bus NJ Transit z Bergenline Ave → Port Authority (~15-20 min, ~$3.50), ferry z Port Imperial w Weehawken (~10 min, ~$9), Uber ~$15-20.
+
+===== CO CHCE KAŻDA OSOBA =====
+${perPersonSummary}
+${everyoneWants.length > 0 ? `Atrakcje które chcą WSZYSCY: ${everyoneWants.join(", ")}` : ""}
+${everyoneWantsFood.length > 0 ? `Jedzenie które chcą WSZYSCY: ${everyoneWantsFood.join(", ")}` : ""}
+
+===== ATRAKCJE =====
+${attrList}
+
+===== JEDZENIE =====
+${foodList}
+
+===== KALENDARZ =====
+${calList}
+Dni wolne: ${freeDays.length > 0 ? freeDays.join(", ") : "brak"}
+
+===== WSKAZÓWKI NYC =====
+Metro: OMNY tap-to-pay $2.90, przesiadki darmowe 2h. Napiwki: restauracje 18-22%. Pogoda maj: 15-25°C. Prąd: 120V typ A/B (przejściówka z EU). Podatek: +8.875%. Darmowe: Staten Island Ferry, Brooklyn Bridge, Central Park, High Line, DUMBO. The Met: pay-what-you-wish.
+
+===== INSTRUKCJE =====
+1. Masz web search. Szukaj aktualnych cen, godzin, lokalizacji. Nie zgaduj.
+2. Trasy podawaj OD Airbnb (Union City NJ). Podawaj linie busów/metra.
+3. "Najbliższy X" → szukaj "X near Union City NJ 07087".
+4. Pytania o wydatki/koszty/rozliczenia → UŻYJ DANYCH POWYŻEJ. Masz je. Nie pytaj o nie.`;
   };
 
   const sendChat = async () => {
