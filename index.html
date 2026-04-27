@@ -16,6 +16,10 @@
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
+<!-- Leaflet (darmowa mapa) -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -39,8 +43,8 @@ h1, h2, h3 { font-family: 'Bebas Neue', sans-serif; letter-spacing: 1px; }
 .tab-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #0e0e24ee;
   backdrop-filter: blur(12px); border-top: 1px solid var(--border); display: flex;
   justify-content: center; gap: 4px; padding: 6px 8px; z-index: 100; }
-.tab-btn { flex: 1; max-width: 100px; background: none; border: none; color: var(--text2);
-  font-family: 'Nunito', sans-serif; font-size: 0.7em; font-weight: 600; padding: 6px 4px;
+.tab-btn { flex: 1; max-width: 90px; background: none; border: none; color: var(--text2);
+  font-family: 'Nunito', sans-serif; font-size: 0.65em; font-weight: 600; padding: 6px 2px;
   border-radius: 10px; cursor: pointer; display: flex; flex-direction: column;
   align-items: center; gap: 2px; transition: all 0.2s; }
 .tab-btn.active { color: var(--accent); background: #FFB80015; }
@@ -150,6 +154,32 @@ h1, h2, h3 { font-family: 'Bebas Neue', sans-serif; letter-spacing: 1px; }
 .editable-name:hover { border-bottom-color: var(--accent); }
 .edit-name-input { background: var(--card2); border: 1px solid var(--accent); border-radius: 6px; color: var(--text);
   padding: 3px 6px; font-family: 'Nunito', sans-serif; font-size: 0.88em; font-weight: 600; width: 100%; }
+
+.chat-container { display: flex; flex-direction: column; height: calc(100vh - 180px); margin: 0 12px; }
+.chat-messages { flex: 1; overflow-y: auto; padding: 8px 0; display: flex; flex-direction: column; gap: 8px; }
+.chat-msg { max-width: 85%; padding: 10px 14px; border-radius: 14px; font-size: 0.88em; line-height: 1.5; word-wrap: break-word; white-space: pre-wrap; }
+.chat-msg.user { align-self: flex-end; background: var(--accent); color: #000; border-bottom-right-radius: 4px; font-weight: 600; }
+.chat-msg.ai { align-self: flex-start; background: var(--card2); color: var(--text); border-bottom-left-radius: 4px; border: 1px solid var(--border); }
+.chat-msg.system { align-self: center; background: transparent; color: var(--text2); font-size: 0.8em; text-align: center; }
+.chat-msg.error { align-self: center; background: #f8717125; color: var(--red); font-size: 0.82em; text-align: center; border: 1px solid var(--red); }
+.chat-input-row { display: flex; gap: 6px; padding: 10px 0; }
+.chat-input { flex: 1; background: var(--card2); border: 1px solid var(--border); border-radius: 10px; color: var(--text);
+  padding: 10px 14px; font-family: 'Nunito', sans-serif; font-size: 0.9em; resize: none; min-height: 44px; max-height: 100px; }
+.chat-input:focus { outline: none; border-color: var(--accent); }
+.chat-send { background: var(--accent); color: #000; border: none; border-radius: 10px; padding: 10px 16px;
+  font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 0.9em; cursor: pointer; white-space: nowrap; }
+.chat-send:hover { background: #e6a600; }
+.chat-send:disabled { opacity: 0.4; cursor: not-allowed; }
+.chat-typing { color: var(--text2); font-size: 0.82em; padding: 4px 0; }
+.api-key-setup { text-align: center; padding: 30px 16px; }
+.api-key-input { width: 100%; background: var(--card2); border: 1px solid var(--border); border-radius: 10px;
+  color: var(--text); padding: 10px 14px; font-family: 'Nunito', sans-serif; font-size: 0.88em; margin: 10px 0; }
+.api-key-input:focus { outline: none; border-color: var(--accent); }
+
+#trip-map { width: 100%; height: 50vh; border-radius: 14px; border: 1px solid var(--border); z-index: 1; }
+.map-legend { display: flex; gap: 12px; flex-wrap: wrap; padding: 8px 0; font-size: 0.8em; color: var(--text2); }
+.map-legend-item { display: flex; align-items: center; gap: 4px; }
+.map-legend-dot { width: 12px; height: 12px; border-radius: 50%; }
 </style>
 </head>
 <body>
@@ -207,7 +237,7 @@ const DEFAULT_DATA = {
 const TABS = [
   { id: "dash", icon: "🗽", label: "Start" }, { id: "cal", icon: "📅", label: "Kalendarz" },
   { id: "places", icon: "✅", label: "Atrakcje" }, { id: "costs", icon: "💰", label: "Koszty" },
-  { id: "map", icon: "🗺️", label: "Mapa" },
+  { id: "map", icon: "🗺️", label: "Mapa" }, { id: "ai", icon: "🤖", label: "AI" },
 ];
 
 // Firebase init
@@ -233,6 +263,12 @@ function App() {
   const [costsView, setCostsView] = useState("add");
   const [expForm, setExpForm] = useState({ desc: "", amount: "", paidBy: "Jordan", split: [...PEOPLE], date: DAYS[0].date, category: "inne" });
   const skipNextUpdate = useRef(false);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  const [apiKey, setApiKey] = useState(() => { try { return localStorage.getItem("nyc_api_key") || ""; } catch { return ""; } });
+  const [apiKeyInput, setApiKeyInput] = useState("");
+  const chatEndRef = useRef(null);
 
   // If Firebase not configured, show setup screen
   if (!firebaseReady) {
@@ -428,6 +464,98 @@ function App() {
 
   const totalExpenses = (data.expenses || []).reduce((s, e) => s + e.amount, 0);
   const allPlaceNames = [...(data.attractions || []).map(a => a.name), ...(data.food || []).map(f => f.name)];
+
+  const saveApiKey = (key) => {
+    setApiKey(key);
+    try { localStorage.setItem("nyc_api_key", key); } catch {}
+  };
+
+  const buildSystemPrompt = () => {
+    const attrList = (data.attractions || []).map(a => {
+      const who = PEOPLE.filter(p => a.votes[p]).join(", ");
+      return `- ${a.name}${a.cost ? ` ($${a.cost}/os)` : ""}${who ? ` (chcą: ${who})` : ""}`;
+    }).join("\n");
+    const foodList = (data.food || []).map(f => {
+      const who = PEOPLE.filter(p => f.votes[p]).join(", ");
+      return `- ${f.name}${f.cost ? ` ($${f.cost}/os)` : ""}${who ? ` (chcą: ${who})` : ""}`;
+    }).join("\n");
+    const calList = DAYS.map(d => {
+      const items = (data.calendar[d.date] || []);
+      if (items.length === 0) return `${d.label}: brak planów`;
+      return `${d.label}: ${items.map(i => `${i.time} ${i.name}`).join(", ")}`;
+    }).join("\n");
+    return `Jesteś pomocnym przewodnikiem po Nowym Jorku dla grupy 4 przyjaciół (Kandi, Jarek, Oliwka, Jordan) lecących 3-13 maja 2026.
+
+WAŻNE — BAZA WYPADOWA (Airbnb):
+Adres: 1807 John F. Kennedy Boulevard, Union City, NJ 07087
+Współrzędne: 40.7693°N, 74.0246°W
+Dojazd do Manhattanu: autobus NJ Transit do Port Authority (~15-20 min) lub Lincoln Tunnel.
+Najbliższe stacje: Bergenline Ave (bus), Port Imperial (NY Waterway ferry).
+
+Gdy ktoś pyta o odległość lub czas dojazdu — ZAWSZE podawaj trasę od tego Airbnb. Podawaj konkretne linie autobusów/metra i szacowany czas.
+
+Odpowiadaj po polsku, krótko i konkretnie.
+
+ATRAKCJE NA LIŚCIE:
+${attrList}
+
+JEDZENIE NA LIŚCIE:
+${foodList}
+
+KALENDARZ:
+${calList}
+
+Łączne wydatki grupy: $${totalExpenses.toFixed(2)}
+
+Pomagaj z: rekomendacjami, cenami biletów, godzinami otwarcia, trasami od Airbnb, co jest blisko czego, pomysłami na jedzenie, wskazówkami jak się poruszać po NYC (metro, autobusy, ferry). Bądź praktyczny i konkretny. Podawaj szacowane czasy dojazdu z Airbnb.`;
+  };
+
+  const sendChat = async () => {
+    if (!chatInput.trim() || chatLoading) return;
+    const userMsg = chatInput.trim();
+    setChatInput("");
+    setChatMessages(prev => [...prev, { role: "user", text: userMsg }]);
+    setChatLoading(true);
+    try {
+      const messages = [];
+      chatMessages.forEach(m => {
+        if (m.role === "user") messages.push({ role: "user", content: m.text });
+        else if (m.role === "ai") messages.push({ role: "assistant", content: m.text });
+      });
+      messages.push({ role: "user", content: userMsg });
+      // Keep last 20 messages to save tokens
+      const trimmed = messages.slice(-20);
+      const resp = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true"
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1024,
+          system: buildSystemPrompt(),
+          messages: trimmed
+        })
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.error?.message || `HTTP ${resp.status}`);
+      }
+      const result = await resp.json();
+      const aiText = result.content.map(c => c.text || "").join("");
+      setChatMessages(prev => [...prev, { role: "ai", text: aiText }]);
+    } catch (err) {
+      setChatMessages(prev => [...prev, { role: "error", text: `Błąd: ${err.message}` }]);
+    }
+    setChatLoading(false);
+  };
+
+  useEffect(() => {
+    if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages, chatLoading]);
 
   if (!loaded) return (
     <div className="loading-screen">
@@ -664,7 +792,16 @@ function App() {
       {/* MAP */}
       {tab === "map" && <>
         <div className="card">
-          <h2>🗺️ ATRAKCJE</h2>
+          <h2>🗺️ MAPA</h2>
+          <div className="map-legend">
+            <div className="map-legend-item"><div className="map-legend-dot" style={{ background: "#4ade80" }}></div>Airbnb</div>
+            <div className="map-legend-item"><div className="map-legend-dot" style={{ background: "#60a5fa" }}></div>Atrakcje</div>
+            <div className="map-legend-item"><div className="map-legend-dot" style={{ background: "#FF6B35" }}></div>Jedzenie</div>
+          </div>
+          <TripMap attractions={data.attractions || []} food={data.food || []} />
+        </div>
+        <div className="card">
+          <h2>📍 ATRAKCJE — GOOGLE MAPS</h2>
           <p style={{ fontSize: "0.8em", color: "var(--text2)", marginBottom: 10 }}>Kliknij żeby otworzyć w Google Maps</p>
           {(data.attractions||[]).map(a => {
             const voted = PEOPLE.filter(p => a.votes[p]);
@@ -678,7 +815,7 @@ function App() {
           })}
         </div>
         <div className="card">
-          <h2>🍽️ JEDZENIE</h2>
+          <h2>🍽️ JEDZENIE — GOOGLE MAPS</h2>
           {(data.food||[]).map(f => {
             const voted = PEOPLE.filter(p => f.votes[p]);
             return (
@@ -700,6 +837,65 @@ function App() {
         </div>
       </>}
 
+      {/* AI CHAT */}
+      {tab === "ai" && <>
+        {!apiKey ? (
+          <div className="card">
+            <div className="api-key-setup">
+              <div style={{ fontSize: "2.5em", marginBottom: 8 }}>🤖</div>
+              <h2 style={{ color: "var(--accent)", marginBottom: 8 }}>CZAT AI — PRZEWODNIK NYC</h2>
+              <p style={{ color: "var(--text2)", fontSize: "0.85em", marginBottom: 12 }}>
+                Wklej swój klucz API od Anthropic żeby włączyć czat.<br/>
+                Klucz zapisze się w przeglądarce — nie musisz go wklejać za każdym razem.
+              </p>
+              <input className="api-key-input" type="password" placeholder="sk-ant-api03-..." value={apiKeyInput}
+                onChange={e => setApiKeyInput(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && apiKeyInput.trim() && saveApiKey(apiKeyInput.trim())} />
+              <button className="add-btn" style={{ width: "100%", padding: 12, fontSize: "1em", marginTop: 4 }}
+                onClick={() => apiKeyInput.trim() && saveApiKey(apiKeyInput.trim())}>
+                🔑 Zapisz klucz i włącz czat
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="chat-container">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0 8px" }}>
+              <h2 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "1.3em", color: "var(--accent)" }}>🤖 PRZEWODNIK NYC</h2>
+              <button className="del-btn" style={{ opacity: 0.7, fontSize: "0.75em" }}
+                onClick={() => { saveApiKey(""); setApiKeyInput(""); setChatMessages([]); }}>
+                Zmień klucz
+              </button>
+            </div>
+            <div className="chat-messages">
+              {chatMessages.length === 0 && (
+                <div className="chat-msg system">
+                  Zapytaj mnie o cokolwiek dot. NYC!<br/>
+                  Znam Wasze atrakcje, jedzenie i kalendarz.<br/><br/>
+                  Np. "Ile kosztuje bilet na Statue of Liberty?"<br/>
+                  "Co jest blisko DUMBO?"<br/>
+                  "Zaproponuj plan na dzień 3"
+                </div>
+              )}
+              {chatMessages.map((m, i) => (
+                <div key={i} className={`chat-msg ${m.role === "user" ? "user" : m.role === "error" ? "error" : "ai"}`}>
+                  {m.text}
+                </div>
+              ))}
+              {chatLoading && <div className="chat-typing">🤖 Myślę...</div>}
+              <div ref={chatEndRef} />
+            </div>
+            <div className="chat-input-row">
+              <textarea className="chat-input" rows="1" placeholder="Zapytaj o NYC..." value={chatInput}
+                onChange={e => setChatInput(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); } }} />
+              <button className="chat-send" disabled={chatLoading || !chatInput.trim()} onClick={sendChat}>
+                Wyślij
+              </button>
+            </div>
+          </div>
+        )}
+      </>}
+
       {/* TAB BAR */}
       <div className="tab-bar">
         {TABS.map(t => (
@@ -710,6 +906,104 @@ function App() {
       </div>
     </div>
   );
+}
+
+const AIRBNB_COORDS = [40.7693, -74.0246];
+const NYC_CENTER = [40.7580, -73.9855];
+
+const geocodeCache = {};
+async function geocodePlace(name) {
+  const key = name.toLowerCase().trim();
+  if (geocodeCache[key]) return geocodeCache[key];
+  // Check localStorage cache
+  try {
+    const cached = localStorage.getItem("geo_" + key);
+    if (cached) { const c = JSON.parse(cached); geocodeCache[key] = c; return c; }
+  } catch {}
+  try {
+    const q = encodeURIComponent(name + " New York City");
+    const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${q}&limit=1`);
+    const results = await resp.json();
+    if (results && results.length > 0) {
+      const coords = [parseFloat(results[0].lat), parseFloat(results[0].lon)];
+      geocodeCache[key] = coords;
+      try { localStorage.setItem("geo_" + key, JSON.stringify(coords)); } catch {}
+      return coords;
+    }
+  } catch (e) { console.error("Geocode error:", name, e); }
+  return null;
+}
+
+function TripMap({ attractions, food }) {
+  const mapRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const markersRef = useRef([]);
+
+  useEffect(() => {
+    // Small delay to ensure DOM is ready
+    const timer = setTimeout(() => {
+      if (!mapRef.current) return;
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+      const map = L.map(mapRef.current).setView(NYC_CENTER, 12);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: '© OpenStreetMap'
+      }).addTo(map);
+
+      // Airbnb marker
+      const airbnbIcon = L.divIcon({
+        html: '<div style="background:#4ade80;width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>',
+        className: '', iconSize: [14, 14], iconAnchor: [7, 7]
+      });
+      L.marker(AIRBNB_COORDS, { icon: airbnbIcon })
+        .bindPopup("<strong>🏡 Airbnb</strong><br>1807 JFK Blvd, Union City, NJ")
+        .addTo(map);
+
+      mapInstanceRef.current = map;
+
+      // Geocode and add markers
+      const allPlaces = [
+        ...attractions.map(a => ({ name: a.name, type: "attraction" })),
+        ...food.map(f => ({ name: f.name, type: "food" }))
+      ];
+
+      let delay = 0;
+      allPlaces.forEach(place => {
+        setTimeout(async () => {
+          const coords = await geocodePlace(place.name);
+          if (coords && mapInstanceRef.current) {
+            const color = place.type === "attraction" ? "#60a5fa" : "#FF6B35";
+            const icon = L.divIcon({
+              html: `<div style="background:${color};width:10px;height:10px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.4)"></div>`,
+              className: '', iconSize: [10, 10], iconAnchor: [5, 5]
+            });
+            const emoji = place.type === "attraction" ? "📍" : "🍴";
+            const marker = L.marker(coords, { icon })
+              .bindPopup(`<strong>${emoji} ${place.name}</strong>`)
+              .addTo(mapInstanceRef.current);
+            markersRef.current.push(marker);
+          }
+        }, delay);
+        // Stagger requests to respect Nominatim rate limit (1 req/sec)
+        if (!geocodeCache[place.name.toLowerCase().trim()]) {
+          delay += 1100;
+        }
+      });
+    }, 200);
+
+    return () => {
+      clearTimeout(timer);
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+      markersRef.current = [];
+    };
+  }, [attractions, food]);
+
+  return <div id="trip-map" ref={mapRef}></div>;
 }
 
 function EditableName({ value, onSave }) {
