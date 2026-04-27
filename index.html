@@ -145,6 +145,11 @@ h1, h2, h3 { font-family: 'Bebas Neue', sans-serif; letter-spacing: 1px; }
 .setup-screen h1 { font-size: 2em; color: var(--accent); margin-bottom: 10px; }
 .setup-screen p { color: var(--text2); margin-bottom: 20px; font-size: 0.9em; line-height: 1.5; }
 .setup-screen code { background: var(--card2); padding: 2px 6px; border-radius: 4px; font-size: 0.85em; color: var(--accent); }
+
+.editable-name { cursor: pointer; border-bottom: 1px dashed transparent; transition: border-color 0.2s; padding: 2px 0; }
+.editable-name:hover { border-bottom-color: var(--accent); }
+.edit-name-input { background: var(--card2); border: 1px solid var(--accent); border-radius: 6px; color: var(--text);
+  padding: 3px 6px; font-family: 'Nunito', sans-serif; font-size: 0.88em; font-weight: 600; width: 100%; }
 </style>
 </head>
 <body>
@@ -330,6 +335,23 @@ function App() {
   };
 
   const removePlace = (type, id) => saveData({ ...data, [type]: data[type].filter(x => x.id !== id) });
+
+  const renamePlace = (type, id, newName) => {
+    if (!newName.trim()) return;
+    const list = [...data[type]];
+    const idx = list.findIndex(x => x.id === id);
+    if (idx < 0) return;
+    const oldName = list[idx].name;
+    list[idx] = { ...list[idx], name: newName.trim() };
+    // Also update calendar entries that reference the old name
+    const cal = { ...data.calendar };
+    Object.keys(cal).forEach(date => {
+      cal[date] = (cal[date] || []).map(item =>
+        item.name === oldName ? { ...item, name: newName.trim() } : item
+      );
+    });
+    saveData({ ...data, [type]: list, calendar: cal });
+  };
 
   const ensureAttractionExists = (name, d) => {
     const all = [...d.attractions, ...d.food].map(x => x.name.toLowerCase());
@@ -517,7 +539,9 @@ function App() {
             <tbody>
               {(data[placesTab]||[]).map(item => (
                 <tr key={item.id}>
-                  <td style={{ fontWeight: 600, fontSize: "0.9em" }}>{item.name}</td>
+                  <td style={{ fontWeight: 600, fontSize: "0.9em" }}>
+                    <EditableName value={item.name} onSave={(newName) => renamePlace(placesTab, item.id, newName)} />
+                  </td>
                   {PEOPLE.map(p => (
                     <td key={p} className="check-cell">
                       <button className={`check-btn ${item.votes[p] ? "checked" : ""}`} onClick={() => toggleVote(placesTab, item.id, p)}>
@@ -686,6 +710,29 @@ function App() {
       </div>
     </div>
   );
+}
+
+function EditableName({ value, onSave }) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(value);
+  const inputRef = useRef(null);
+
+  useEffect(() => { setText(value); }, [value]);
+  useEffect(() => { if (editing && inputRef.current) inputRef.current.focus(); }, [editing]);
+
+  const handleSave = () => {
+    setEditing(false);
+    if (text.trim() && text.trim() !== value) onSave(text.trim());
+    else setText(value);
+  };
+
+  if (editing) {
+    return <input ref={inputRef} className="edit-name-input" value={text}
+      onChange={e => setText(e.target.value)}
+      onBlur={handleSave}
+      onKeyDown={e => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") { setText(value); setEditing(false); } }} />;
+  }
+  return <span className="editable-name" onClick={() => setEditing(true)} title="Kliknij żeby edytować">{value}</span>;
 }
 
 function CalendarAddRow({ places, onAdd }) {
