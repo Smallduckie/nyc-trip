@@ -507,7 +507,9 @@ ${calList}
 
 Łączne wydatki grupy: $${totalExpenses.toFixed(2)}
 
-Pomagaj z: rekomendacjami, cenami biletów, godzinami otwarcia, trasami od Airbnb, co jest blisko czego, pomysłami na jedzenie, wskazówkami jak się poruszać po NYC (metro, autobusy, ferry). Bądź praktyczny i konkretny. Podawaj szacowane czasy dojazdu z Airbnb.`;
+Pomagaj z: rekomendacjami, cenami biletów, godzinami otwarcia, trasami od Airbnb, co jest blisko czego, pomysłami na jedzenie, wskazówkami jak się poruszać po NYC (metro, autobusy, ferry). Bądź praktyczny i konkretny. Podawaj szacowane czasy dojazdu z Airbnb.
+
+WAŻNE: Masz dostęp do wyszukiwania w internecie. ZAWSZE szukaj w internecie gdy pytanie dotyczy: lokalizacji, odległości, cen biletów, godzin otwarcia, najbliższych miejsc, adresów, aktualnych informacji. Nie odpowiadaj z pamięci na takie pytania — szukaj aktualnych danych.`;
   };
 
   const sendChat = async () => {
@@ -535,9 +537,10 @@ Pomagaj z: rekomendacjami, cenami biletów, godzinami otwarcia, trasami od Airbn
         },
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
-          max_tokens: 1024,
+          max_tokens: 2048,
           system: buildSystemPrompt(),
-          messages: trimmed
+          messages: trimmed,
+          tools: [{ type: "web_search_20250305", name: "web_search" }]
         })
       });
       if (!resp.ok) {
@@ -545,8 +548,12 @@ Pomagaj z: rekomendacjami, cenami biletów, godzinami otwarcia, trasami od Airbn
         throw new Error(err.error?.message || `HTTP ${resp.status}`);
       }
       const result = await resp.json();
-      const aiText = result.content.map(c => c.text || "").join("");
-      setChatMessages(prev => [...prev, { role: "ai", text: aiText }]);
+      const aiText = result.content
+        .filter(c => c.type === "text")
+        .map(c => c.text || "")
+        .join("\n")
+        .trim();
+      setChatMessages(prev => [...prev, { role: "ai", text: aiText || "Nie udało się uzyskać odpowiedzi." }]);
     } catch (err) {
       setChatMessages(prev => [...prev, { role: "error", text: `Błąd: ${err.message}` }]);
     }
@@ -870,10 +877,10 @@ Pomagaj z: rekomendacjami, cenami biletów, godzinami otwarcia, trasami od Airbn
               {chatMessages.length === 0 && (
                 <div className="chat-msg system">
                   Zapytaj mnie o cokolwiek dot. NYC!<br/>
-                  Znam Wasze atrakcje, jedzenie i kalendarz.<br/><br/>
-                  Np. "Ile kosztuje bilet na Statue of Liberty?"<br/>
-                  "Co jest blisko DUMBO?"<br/>
-                  "Zaproponuj plan na dzień 3"
+                  Szukam w internecie żeby dać Ci aktualne info.<br/><br/>
+                  Np. "Gdzie jest najbliższy Walmart?"<br/>
+                  "Ile kosztuje bilet na Statue of Liberty?"<br/>
+                  "Jak dojechać z Airbnb do Central Park?"
                 </div>
               )}
               {chatMessages.map((m, i) => (
